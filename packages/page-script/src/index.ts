@@ -92,7 +92,11 @@ import {
 } from "./internal-state.js";
 import { determineReferrer, parseReferrerPolicy } from "@kitesurf/script-gate/referrer-policy";
 import { invokeSessionMethod } from "./session-methods.ts";
-import { clearSessionOutbound, setSessionOutbound } from "./session-outbound.ts";
+import {
+  cancelSessionResponseBodies,
+  clearSessionOutbound,
+  setSessionOutbound,
+} from "./session-outbound.ts";
 import {
   installResourceFetchBridge,
   fontsIdle,
@@ -156,6 +160,7 @@ import {
   cascadeSeq,
   documentScrollSize,
   ensurePaintDom,
+  geometryDom,
   invalidatePaintDom,
   discoverFontFaces,
   loadFontFaces,
@@ -169,6 +174,8 @@ import {
 } from "./paint.ts";
 import { installLagWatchdog } from "./lag-monitor.ts";
 import {
+  resetDeepSettleBudget,
+  drainScriptSettleMicrotasks,
   drainSettleMicrotasks,
   NativePromise,
   nativeSetTimeout,
@@ -3158,6 +3165,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
     navigateOptions?: NavigateOptions,
   ): Promise<NavigateSummary> {
     state.navigateStarted = true;
+    resetDeepSettleBudget();
     startCycleCollector();
     const safeUrl = typeof url === "string" ? url : "about:blank";
     let source: NavigateSource | null = navigateSourceFor(html);
@@ -3520,7 +3528,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
         },
         getRectByAuthId: (authId: number) => {
           if (typeof authId !== "number" || authId <= 0) return null;
-          const paint = ensurePaintDom();
+          const paint = geometryDom();
           if (!paint) return null;
           try {
             return rectWithScrollOffset(paint.getBoundingClientRect(authId));
@@ -3531,7 +3539,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
         },
         getScrollInfoByAuthId: (authId: number) => {
           if (typeof authId !== "number" || authId <= 0) return null;
-          const paint = ensurePaintDom();
+          const paint = geometryDom();
           if (!paint) return null;
           try {
             return paint.nodeScrollInfo(authId);
@@ -3542,7 +3550,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
         },
         getOffsetMetricsByAuthId: (authId: number) => {
           if (typeof authId !== "number" || authId <= 0) return null;
-          const paint = ensurePaintDom();
+          const paint = geometryDom();
           if (!paint) return null;
           try {
             return paint.offsetMetrics(authId);
@@ -3553,7 +3561,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
         },
         getStickyShiftByAuthId: (authId: number) => {
           if (typeof authId !== "number" || authId <= 0) return null;
-          const paint = ensurePaintDom();
+          const paint = geometryDom();
           if (!paint) return null;
           try {
             return paint.stickyShift(authId);
@@ -3650,8 +3658,14 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
       }
     };
     getInternalState().endClassicScript = async () => {
+      // Only a script that read document.currentScript needs its microtask
+      // chain to settle before the value clears; draining that deep for every
+      // script cost 15 s on pages that read it from every script.
+      const cs = getInternalState();
+      const readCurrentScript = cs.currentScriptRead === true;
+      cs.currentScriptRead = false;
       try {
-        await drainSettleMicrotasks();
+        await drainScriptSettleMicrotasks(readCurrentScript);
       } catch {}
       try {
         getInternalState().setCurrentScript?.(null);
@@ -3680,7 +3694,9 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
         cancelable: false,
       });
       try {
-        await drainSettleMicrotasks();
+        // The lifecycle event runs after the script, where currentScript is
+        // already null, so one turn is enough.
+        await drainSettleMicrotasks(1);
       } catch {}
     };
     getInternalState().afterScriptInsert = (info: unknown) => {
@@ -3970,6 +3986,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
         const POLL_INTERVAL_MS = 10;
         const SUBRESOURCE_INFLIGHT_WAIT_BACKSTOP_MS = 1_000;
         const QUIET_TURNS = Math.max(1, startupResourceDrainQuietTurns);
+        const MAX_RESOURCE_DRAIN_POLLS = 400;
         const resourceDrainStartedAt = nowMs();
         const statsAtStart = snapshotFetchStats();
         let pollCount = 0;
@@ -3978,6 +3995,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
         let iframeGateExpired = false;
         while (true) {
           if (sessionClosing) throw SESSION_CLOSED_ERROR;
+          if (pollCount > MAX_RESOURCE_DRAIN_POLLS) break;
           let hasCriticalResources = false;
           if (state.dom && typeof state.dom.hasPendingCriticalResources === "function") {
             try {
@@ -4032,6 +4050,10 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
                 nativeSleep(SUBRESOURCE_INFLIGHT_WAIT_BACKSTOP_MS),
                 sessionClosingSignal,
               ]);
+              // waitForInflightZero can resolve in a microtask when inflight
+              // flickers to zero; yield a macrotask so busy pages never pin
+              // the isolate in a microtask chain.
+              await nativeSleep(0);
             } else {
               await NativePromise.race([nativeSleep(POLL_INTERVAL_MS), sessionClosingSignal]);
             }
@@ -4072,6 +4094,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
       ];
       const settleBaseline = getSettleState();
 
+      state.loadEventFired = true;
       state.setReadyState("complete");
       dispatchLifecycle(state.document, "readystatechange", { bubbles: false });
       dispatchLifecycle(state.window, "load", { bubbles: false });
@@ -4119,6 +4142,10 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
       try {
         startLateSpriteSweep();
       } catch {}
+      // Start fetching @font-face rules activated during hydration before capture waits on them.
+      if (!fontDeferActive()) {
+        discoverFontFaces();
+      }
       markLoadPhase("postLoadDrainMs");
 
       return {
@@ -4235,6 +4262,7 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
       }
       if (outbound) {
         clearSessionOutbound(outbound);
+        cancelSessionResponseBodies();
         try {
           outbound[Symbol.dispose] && outbound[Symbol.dispose]();
         } catch {}
@@ -6808,6 +6836,14 @@ function queryDomSetSuppressBackgrounds(
   }
 }
 
+// Deadlines must not use Date.now(): the clock can freeze while the isolate
+// runs synchronously, so a drain loop bounded only by wall time never ends.
+const MAX_IMAGE_DRAIN_ITERATIONS = 1000;
+
+function drainClockNow(): number {
+  return typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+}
+
 async function queryDomAwaitPendingResources(
   pageState: QueryDomActiveState,
   queryArgs: Record<string, unknown>,
@@ -6817,7 +6853,7 @@ async function queryDomAwaitPendingResources(
     queryArgs && typeof queryArgs.timeoutMs === "number" && queryArgs.timeoutMs > 0
       ? queryArgs.timeoutMs
       : DEFAULT_PENDING_RESOURCE_TIMEOUT_MS;
-  const drainStartedAt = Date.now();
+  const drainStartedAt = drainClockNow();
   const deadline = drainStartedAt + timeoutMs;
 
   if (queryArgs && queryArgs.upgradeFonts === true) {
@@ -6849,7 +6885,7 @@ async function queryDomAwaitPendingResources(
         ]);
 
   if (fontPromises.length > 0) await fontsDone;
-  const fontsMs = Date.now() - drainStartedAt;
+  const fontsMs = drainClockNow() - drainStartedAt;
 
   const scopeArg =
     queryArgs && typeof queryArgs.scope === "object"
@@ -6878,9 +6914,15 @@ async function queryDomAwaitPendingResources(
 
   // The drain below waits for these faces anyway; loading them before its first layout keeps
   // that layout from shaping the page in fallback fonts only to reshape it when they land.
-  discoverFontFaces();
-  if (fontsInflightCount() > 0) {
-    await NativePromise.race([fontsIdle(), nativeSleep(Math.max(0, deadline - Date.now()))]);
+  // Re-discover after a wave settles so fallback families fetch when a primary face fails or
+  // lacks a glyph.
+  const MAX_FONT_DISCOVERY_PASSES = 3;
+  for (let pass = 0; pass < MAX_FONT_DISCOVERY_PASSES; pass++) {
+    discoverFontFaces();
+    if (fontsInflightCount() === 0) break;
+    const remainingMs = Math.max(0, deadline - drainClockNow());
+    if (remainingMs === 0) break;
+    await NativePromise.race([fontsIdle(), nativeSleep(remainingMs)]);
   }
   const images = await drainPendingImages(pageState, captureRect, deadline, drainStartedAt);
   if (fontPromises.length > 0) {
@@ -6962,15 +7004,15 @@ async function drainPendingImages(
   while (true) {
     iterations++;
     if (iterTimes.length < MAX_IMAGE_DRAIN_ITERATION_SAMPLES) {
-      iterTimes.push(Date.now() - drainStartedAt);
+      iterTimes.push(drainClockNow() - drainStartedAt);
     }
     const sheetSeq = getStylesheetDeliverySeq();
     const wantResolve =
       resolves === 0 ||
-      (sheetSeq !== lastResolveSheetSeq && Date.now() - lastResolveAt >= MIN_RESOLVE_GAP_MS);
-    if (wantResolve && (resolves === 0 || Date.now() < deadline)) {
+      (sheetSeq !== lastResolveSheetSeq && drainClockNow() - lastResolveAt >= MIN_RESOLVE_GAP_MS);
+    if (wantResolve && (resolves === 0 || drainClockNow() < deadline)) {
       lastResolveSheetSeq = sheetSeq;
-      lastResolveAt = Date.now();
+      lastResolveAt = drainClockNow();
       resolves++;
       try {
         pending = dom.discoverPendingImages() | 0;
@@ -6982,10 +7024,10 @@ async function drainPendingImages(
     }
     if (captureRect) {
       if (countRelevantInflightImages(scope) === 0) break;
-    } else if (pending === 0 && resourceInflight.size === 0) {
+    } else if (pending === 0 && !hasPaintRelevantInflight()) {
       break;
     }
-    if (Date.now() >= deadline) {
+    if (iterations > MAX_IMAGE_DRAIN_ITERATIONS || drainClockNow() >= deadline) {
       return reportPendingImageDrainTimeout({
         drainStartedAt,
         waited,
@@ -7001,7 +7043,7 @@ async function drainPendingImages(
   return {
     waited,
     timedOut: false,
-    ms: Date.now() - drainStartedAt,
+    ms: drainClockNow() - drainStartedAt,
     pending: 0,
     inflight: 0,
     resolves,
@@ -7019,10 +7061,23 @@ function readPendingImageCount(dom: PendingImageDom): number {
   return 0;
 }
 
+function isPaintRelevantInflight(url: string): boolean {
+  // Post-load async scripts/modules do not block paint; startup scripts started before load
+  // still participate so DOMContentLoaded screenshots wait for initial rendering scripts.
+  return !url.startsWith("postload-script:") && !url.startsWith("postload-module:");
+}
+
+function hasPaintRelevantInflight(): boolean {
+  for (const url of resourceInflight) {
+    if (isPaintRelevantInflight(url)) return true;
+  }
+  return false;
+}
+
 function countRelevantInflightImages(scope: PendingImageScope): number {
   let relevantCount = 0;
   for (const url of resourceInflight) {
-    if (!isImageInflight(url)) relevantCount++;
+    if (!isImageInflight(url) && isPaintRelevantInflight(url)) relevantCount++;
   }
   if (relevantCount > 0 || !scope.captureRect) return relevantCount;
   const seqNow = cascadeSeq() | 0;
@@ -7053,10 +7108,13 @@ function imageUrlCaptureRelevance(
   let hits = false;
   try {
     const ids = dom.pendingImageNodes ? Array.from(dom.pendingImageNodes(url)) : [];
+    // If we know the waiting <img> nodes and none have a layout box intersecting captureRect
+    // (e.g. display:none or detached), the image cannot paint in this capture. Keep known=false
+    // only when ids is empty (CSS background-image, whose nodes are not listed here).
+    if (ids.length > 0) known = true;
     for (const id of ids) {
       const range = dom.getBoundingClientRect ? dom.getBoundingClientRect(id) : null;
       if (!range) continue;
-      known = true;
       const rectX = Number(range.x) || 0;
       const rectY = Number(range.y) || 0;
       const width = Number(range.width) || 0;
@@ -7087,6 +7145,7 @@ function reportPendingImageDrainTimeout(options: {
   iterTimes: number[];
 }): PendingImageDrain {
   const currentTime = Date.now();
+  const elapsedMs = Math.round(drainClockNow() - options.drainStartedAt);
   const stuck: string[] = [];
   const MAX_STUCK_RESOURCE_URLS_LOGGED = 4;
   for (const url of resourceInflight) {
@@ -7095,7 +7154,7 @@ function reportPendingImageDrainTimeout(options: {
     if (stuck.length >= MAX_STUCK_RESOURCE_URLS_LOGGED) break;
   }
   console.warn(
-    `[ks-images] image drain timed out after ${currentTime - options.drainStartedAt}ms: ` +
+    `[ks-images] image drain timed out after ${elapsedMs}ms: ` +
       `pending=${options.pending} inflight=${resourceInflight.size} ` +
       `resolves=${options.resolves} iterations=${options.iterations}` +
       ` iterTimes=[${options.iterTimes.join(",")}]` +
@@ -7104,7 +7163,7 @@ function reportPendingImageDrainTimeout(options: {
   return {
     waited: options.waited,
     timedOut: true,
-    ms: currentTime - options.drainStartedAt,
+    ms: elapsedMs,
     pending: options.pending,
     inflight: resourceInflight.size,
     resolves: options.resolves,
