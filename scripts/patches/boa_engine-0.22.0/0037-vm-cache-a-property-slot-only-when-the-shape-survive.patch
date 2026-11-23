@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: bpereira <bpereira@cloudflare.com>
+Date: Mon, 23 Nov 2026 10:42:05 +0000
+Subject: [PATCH] vm: cache a property slot only when the shape survived the
+ accessor
+
+`get_by_name` resolved the slot before `__get__` ran and read the shape after
+it. A getter that replaces itself changes the shape in between, so the cache
+mapped the new shape to an accessor slot, and every later megamorphic read of
+that shape treated the value as a getter. Compare the shape address before and
+after the call and skip the store when it moved. `set/property.rs` stored the
+same pair after `__set__` and gets the same guard.
+---
+ src/vm/opcode/get/property.rs | 8 +++++++-
+ src/vm/opcode/set/property.rs | 8 +++++++-
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/src/vm/opcode/get/property.rs b/src/vm/opcode/get/property.rs
+index f1833ad..2216227 100644
+--- a/src/vm/opcode/get/property.rs
++++ b/src/vm/opcode/get/property.rs
+@@ -99,6 +99,10 @@ fn get_by_name<const LENGTH: bool>(
+
+     drop(object_borrowed);
+
++    // A getter can replace itself, which changes the object's shape. The slot resolved above
++    // belongs to the shape before the call, so cache the pair only if the shape survived it.
++    let shape_before = object.borrow().shape().to_addr_usize();
++
+     let key: PropertyKey = ic.name.clone().into();
+
+     let context = &mut InternalMethodPropertyContext::new(context);
+@@ -110,7 +114,9 @@ fn get_by_name<const LENGTH: bool>(
+         let ic = &context.vm.frame().code_block.ic()[usize::from(index)];
+         let object_borrowed = object.borrow();
+         let shape = object_borrowed.shape();
+-        if ic.megamorphic.get() {
++        if shape.to_addr_usize() != shape_before {
++            // The getter replaced itself, so `slot` describes the shape it left behind.
++        } else if ic.megamorphic.get() {
+             if has_ordinary_get(object.vtable()) {
+                 let name = ic.name.clone();
+                 let shape_clone = shape.clone();
+diff --git a/src/vm/opcode/set/property.rs b/src/vm/opcode/set/property.rs
+index 115949b..e398a92 100644
+--- a/src/vm/opcode/set/property.rs
++++ b/src/vm/opcode/set/property.rs
+@@ -87,6 +87,10 @@ fn set_by_name(
+     }
+     drop(object_borrowed);
+
++    // A setter can replace itself, which changes the object's shape. The slot resolved above
++    // belongs to the shape before the call, so cache the pair only if the shape survived it.
++    let shape_before = object.borrow().shape().to_addr_usize();
++
+     let name: PropertyKey = ic.name.clone().into();
+
+     let context = &mut InternalMethodPropertyContext::new(context);
+@@ -103,7 +107,9 @@ fn set_by_name(
+         let ic = &context.vm.frame().code_block.ic()[usize::from(index)];
+         let object_borrowed = object.borrow();
+         let shape = object_borrowed.shape();
+-        if ic.megamorphic.get() {
++        if shape.to_addr_usize() != shape_before {
++            // The setter replaced itself, so `slot` describes the shape it left behind.
++        } else if ic.megamorphic.get() {
+             if has_ordinary_set(object.vtable()) {
+                 let name = ic.name.clone();
+                 let shape_clone = shape.clone();

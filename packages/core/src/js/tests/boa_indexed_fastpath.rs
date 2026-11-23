@@ -376,6 +376,66 @@ fn inline_cache_and_ordinary_get_match_v8_oracle() {
 }
 
 #[test]
+fn megamorphic_cache_skips_a_getter_that_changed_the_shape() {
+    // A getter that replaces itself changes the shape after the slot was resolved. Caching that
+    // pair maps the new shape to the old slot, and the cache is shared by the whole VM, so an
+    // unrelated object of the same shape reads the wrong thing.
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            "getter_replaces_itself_with_a_data_property",
+            r#"(() => {
+              function rd(o) { return o.x; }
+              [{x:0},{a:0,x:0},{b:0,x:0},{c:0,x:0},{d:0,x:0}].forEach(rd);
+              const o = { get x() { delete this.x; return this.x = { ok: 1 }; } };
+              rd(o);
+              return JSON.stringify([rd(o).ok, rd({ x: { ok: 2 } }).ok]);
+            })()"#,
+            "[1,2]",
+        ),
+        (
+            "getter_replaces_itself_with_a_function",
+            r#"(() => {
+              function rd(o) { return o.x; }
+              [{x:0},{a:0,x:0},{b:0,x:0},{c:0,x:0},{d:0,x:0}].forEach(rd);
+              const o = { get x() { delete this.x; return this.x = () => 7; } };
+              rd(o);
+              return JSON.stringify([rd(o)(), rd({ x: () => 9 })()]);
+            })()"#,
+            "[7,9]",
+        ),
+        (
+            "getter_replaces_itself_with_define_property",
+            r#"(() => {
+              function rd(o) { return o.x; }
+              [{x:0},{a:0,x:0},{b:0,x:0},{c:0,x:0},{d:0,x:0}].forEach(rd);
+              const o = { get x() {
+                Object.defineProperty(this, "x", { value: { ok: 3 }, writable: true, configurable: true });
+                return this.x;
+              } };
+              rd(o);
+              return JSON.stringify([rd(o).ok, rd({ x: { ok: 4 } }).ok]);
+            })()"#,
+            "[3,4]",
+        ),
+        (
+            "getter_removes_itself_and_returns_a_primitive",
+            r#"(() => {
+              function rd(o) { return o.x; }
+              [{x:0},{a:0,x:0},{b:0,x:0},{c:0,x:0},{d:0,x:0}].forEach(rd);
+              const o = { get x() { delete this.x; return 1; } };
+              const first = rd(o);
+              return JSON.stringify([first, rd({}) === undefined]);
+            })()"#,
+            "[1,true]",
+        ),
+    ];
+
+    for &(name, src, expected) in cases {
+        assert_eq!(eval_json(src), expected, "oracle mismatch on {name}");
+    }
+}
+
+#[test]
 fn ordinary_set_and_rope_strings_match_v8_oracle() {
     let cases: &[(&str, &str, &str)] = &[
         (
