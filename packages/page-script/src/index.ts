@@ -174,7 +174,6 @@ import {
 } from "./paint.ts";
 import { installLagWatchdog } from "./lag-monitor.ts";
 import {
-  resetDeepSettleBudget,
   drainScriptSettleMicrotasks,
   drainSettleMicrotasks,
   NativePromise,
@@ -3165,7 +3164,6 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
     navigateOptions?: NavigateOptions,
   ): Promise<NavigateSummary> {
     state.navigateStarted = true;
-    resetDeepSettleBudget();
     startCycleCollector();
     const safeUrl = typeof url === "string" ? url : "about:blank";
     let source: NavigateSource | null = navigateSourceFor(html);
@@ -3658,14 +3656,11 @@ export class PageScript extends WorkerEntrypoint implements PageScriptSession {
       }
     };
     getInternalState().endClassicScript = async () => {
-      // Only a script that read document.currentScript needs its microtask
-      // chain to settle before the value clears; draining that deep for every
-      // script cost 15 s on pages that read it from every script.
-      const cs = getInternalState();
-      const readCurrentScript = cs.currentScriptRead === true;
-      cs.currentScriptRead = false;
+      // Every script settles its microtask chain before the next one runs, and before
+      // document.currentScript clears.
+      getInternalState().currentScriptRead = false;
       try {
-        await drainScriptSettleMicrotasks(readCurrentScript);
+        await drainScriptSettleMicrotasks();
       } catch {}
       try {
         getInternalState().setCurrentScript?.(null);
