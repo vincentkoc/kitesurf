@@ -10610,6 +10610,10 @@
     "expected": "FAIL",
     "reason": null
   },
+  "/css/css-overflow/overflow-abpos-transform.html": {
+    "expected": "PASS",
+    "reason": "transform-aware scrollable overflow for abspos boxes"
+  },
   "/css/css-overflow/parsing/block-ellipsis-invalid.html": {
     "expected": "PASS",
     "reason": null
@@ -10733,6 +10737,10 @@
   "/css/css-overflow/parsing/webkit-line-clamp-valid.html": {
     "expected": "PASS",
     "reason": null
+  },
+  "/css/css-overflow/scrollable-overflow-transform-011.html": {
+    "expected": "PASS",
+    "reason": "transform-aware scrollable overflow"
   },
   "/css/css-page/cssom/margin-001.html": {
     "expected": "FAIL",
