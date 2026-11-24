@@ -12,4 +12,3 @@ mod boa_code_stats;
 mod boa_bytecode_swap;
 mod boa_body_swap;
 mod boa_live_marker;
-mod boa_indexed_fastpath;

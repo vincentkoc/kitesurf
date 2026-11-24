@@ -9,12 +9,12 @@ index stringification, and temporary argument arrays adds overhead on every
 crossing; HostProxyTraps lets those handlers dispatch directly while
 preserving Proxy invariant checks whenever the target has own properties.
 ---
- src/builtins/proxy/mod.rs   | 188 ++++++++++++++++++++++++++----------
+ src/builtins/proxy/mod.rs   | 191 ++++++++++++++++++++++++++----------
  src/builtins/proxy/tests.rs |  90 +++++++++++++++++
- 2 files changed, 228 insertions(+), 50 deletions(-)
+ 2 files changed, 231 insertions(+), 50 deletions(-)
 
 diff --git a/src/builtins/proxy/mod.rs b/src/builtins/proxy/mod.rs
-index 9dfcbc8..a9519c1 100644
+index 9dfcbc8..bd92ca8 100644
 --- a/src/builtins/proxy/mod.rs
 +++ b/src/builtins/proxy/mod.rs
 @@ -22,7 +22,7 @@ use crate::{
@@ -26,7 +26,7 @@ index 9dfcbc8..a9519c1 100644
          internal_methods::{
              CallValue, InternalMethodPropertyContext, InternalObjectMethods,
              ORDINARY_INTERNAL_METHODS, is_compatible_property_descriptor,
-@@ -34,8 +34,57 @@ use crate::{
+@@ -34,8 +34,60 @@ use crate::{
      string::StaticJsStrings,
      value::Type,
  };
@@ -71,6 +71,9 @@ index 9dfcbc8..a9519c1 100644
 +        return false;
 +    }
 +    let borrowed = target.borrow();
++    if !borrowed.extensible {
++        return false;
++    }
 +    let props = borrowed.properties();
 +    let indexed_empty = match &props.indexed_properties {
 +        IndexedProperties::DenseI32(v) => v.is_empty(),
@@ -85,7 +88,7 @@ index 9dfcbc8..a9519c1 100644
  /// Javascript `Proxy` object.
  #[derive(Debug, Clone, Trace, Finalize)]
  pub struct Proxy {
-@@ -736,24 +785,28 @@ pub(crate) fn proxy_exotic_has_property(
+@@ -736,24 +788,28 @@ pub(crate) fn proxy_exotic_has_property(
          .js_expect("Proxy object internal internal method called on non-proxy object")?
          .try_data()?;
 
@@ -130,7 +133,7 @@ index 9dfcbc8..a9519c1 100644
          // a. Let targetDesc be ? target.[[GetOwnProperty]](P).
          let target_desc = target.__get_own_property__(key, context)?;
 
-@@ -828,19 +881,28 @@ pub(crate) fn proxy_exotic_get(
+@@ -828,19 +884,28 @@ pub(crate) fn proxy_exotic_get(
          .js_expect("Proxy object internal internal method called on non-proxy object")?
          .try_data()?;
 
@@ -171,7 +174,7 @@ index 9dfcbc8..a9519c1 100644
 
      // 8. Let targetDesc be ? target.[[GetOwnProperty]](P).
      let target_desc = target.__get_own_property__(key, context)?;
-@@ -898,31 +960,40 @@ pub(crate) fn proxy_exotic_set(
+@@ -898,31 +963,40 @@ pub(crate) fn proxy_exotic_set(
          .js_expect("Proxy object internal internal method called on non-proxy object")?
          .try_data()?;
 
@@ -232,7 +235,7 @@ index 9dfcbc8..a9519c1 100644
      // 9. Let targetDesc be ? target.[[GetOwnProperty]](P).
      let target_desc = target.__get_own_property__(&key, context)?;
 
-@@ -1177,6 +1248,23 @@ fn proxy_exotic_call(
+@@ -1177,6 +1251,23 @@ fn proxy_exotic_call(
          .js_expect("Proxy object internal internal method called on non-proxy object")?
          .try_data()?;
 
