@@ -42,6 +42,7 @@ mod svg_natural_size;
 mod tab_expansion;
 mod table_cell_style;
 mod table_valign_and_percent;
+mod transform_scroll_overflow;
 mod text_node_rect;
 mod transform_2d_subset;
 mod word_shaping;
