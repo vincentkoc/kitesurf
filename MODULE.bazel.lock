@@ -1122,14 +1122,14 @@
           "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
           "REPO_MAPPING:rules_rust+,rules_cc rules_cc+",
           "FILE:@@+cargo_workspaces+cargo_ws_core//Cargo.lock e2e8e7a757415ded5f470e584c5e220a3b59356f05c90c1d740bdb61ca4ea6fe",
-          "FILE:@@+cargo_workspaces+cargo_ws_core//Cargo.toml 84734cb7f6188ad00e576f28c8fcc385311d2ccd065dbe1c8982b9b9ea30a0c3",
-          "FILE:@@+cargo_workspaces+cargo_ws_core//patched.json a9ace890946bba11a2d722a416e46af5b714294befdcf16d109c1d5f8636025f",
+          "FILE:@@+cargo_workspaces+cargo_ws_core//Cargo.toml 4d179f2b801e6ec97771d8de373016c3977ec44216795a201573a191e075cd9f",
+          "FILE:@@+cargo_workspaces+cargo_ws_core//patched.json ea44d89bb83ef758b50bda0e9edbceb59135e182e59cb1d57bca8208b65d781e",
           "FILE:@@+cargo_workspaces+cargo_ws_renderer//Cargo.lock a194b1cdc256e82653b679f974a3eb17364d51b0f8ead3da0c44a6c29ea93197",
-          "FILE:@@+cargo_workspaces+cargo_ws_renderer//Cargo.toml 2e56ad10052cdf645e335d89bfacc46190ab1399ca68ff9647c11721905a5549",
-          "FILE:@@+cargo_workspaces+cargo_ws_renderer//patched.json a9ace890946bba11a2d722a416e46af5b714294befdcf16d109c1d5f8636025f",
+          "FILE:@@+cargo_workspaces+cargo_ws_renderer//Cargo.toml b4b68833d750268001ddb01b959c80a7f71b7fc539bd286bffbe4b7fcb202e25",
+          "FILE:@@+cargo_workspaces+cargo_ws_renderer//patched.json ea44d89bb83ef758b50bda0e9edbceb59135e182e59cb1d57bca8208b65d781e",
           "FILE:@@+cargo_workspaces+cargo_ws_scene_host//Cargo.lock f9fadaf9329edad78625aebe86ecc9121ea3787527223004e571caf920554878",
-          "FILE:@@+cargo_workspaces+cargo_ws_scene_host//Cargo.toml 48fc9db5f5ca8dcad47c17ba86713ae8dddec5df018a2d74d565c469ad4bb550",
-          "FILE:@@+cargo_workspaces+cargo_ws_scene_host//patched.json a9ace890946bba11a2d722a416e46af5b714294befdcf16d109c1d5f8636025f",
+          "FILE:@@+cargo_workspaces+cargo_ws_scene_host//Cargo.toml 6ad8681c4efdaf18099c8b6a4317791a27a9189a2487baeacf1246bfc10d9e7b",
+          "FILE:@@+cargo_workspaces+cargo_ws_scene_host//patched.json ea44d89bb83ef758b50bda0e9edbceb59135e182e59cb1d57bca8208b65d781e",
           "FILE:@@+cargo_workspaces+cargo_ws_memprof//Cargo.lock 700ce60a085805e81be18248290fa55c12fd753835006ab68256b8f397261384",
           "FILE:@@+cargo_workspaces+cargo_ws_memprof//Cargo.toml 6982e34060f201166856e8294a4c4a42cd957eb79df82f72f536b5318e6244b8",
           "FILE:@@//packages/kitesurf-cli/Cargo.lock 152fed308b4920eadd2828ba02d0dda6109d0a733cba973a78a25394334fd143",
@@ -1370,7 +1370,8 @@
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0001-Implement-PaintScene-push_clip_path-with-vello_cpu-c.patch",
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0002-Skip-premultiplying-opaque-images.patch",
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0003-Prepare-recorded-scenes-for-band-rasterization.patch",
-                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0004-Skip-unsupported-Blend-filter-primitive-in-vello_cpu.patch"
+                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0004-Skip-unsupported-Blend-filter-primitive-in-vello_cpu.patch",
+                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0005-Forward-backdrop_filter-to-vello_cpu-RenderContext-p.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "a09d9356dd2b2f032345711a350c0e2326a854cb5070f899265bc80fb33884b1",
@@ -1719,7 +1720,8 @@
                 "@@//scripts:patches/blitz-paint-0.3.0-beta.4/0037-Resolve-circle-percentage-radii-and-ellipse-side-key.patch",
                 "@@//scripts:patches/blitz-paint-0.3.0-beta.4/0038-Paint-background-clip-text-on-inline-roots-and-inlin.patch",
                 "@@//scripts:patches/blitz-paint-0.3.0-beta.4/0039-Skip-re-painting-the-propagated-canvas-background-on.patch",
-                "@@//scripts:patches/blitz-paint-0.3.0-beta.4/0040-Resolve-drop-shadow-filter-currentColor-from-element.patch"
+                "@@//scripts:patches/blitz-paint-0.3.0-beta.4/0040-Resolve-drop-shadow-filter-currentColor-from-element.patch",
+                "@@//scripts:patches/blitz-paint-0.3.0-beta.4/0041-Emit-backdrop-filter-clipped-to-border-box-before-el.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "28803328124d7b7ea5f8f41501513ccb005559e9f6baf33fa0c1fb7612654a93",
@@ -6116,7 +6118,8 @@
               ],
               "patches": [
                 "@@//scripts:patches/vello_common-0.3.0/0001-Share-one-gradient-LUT-across-consecutive-equal-grad.patch",
-                "@@//scripts:patches/vello_common-0.3.0/0002-Prepare-ColorMatrix-filter-primitives-in-PreparedFil.patch"
+                "@@//scripts:patches/vello_common-0.3.0/0002-Prepare-ColorMatrix-filter-primitives-in-PreparedFil.patch",
+                "@@//scripts:patches/vello_common-0.3.0/0003-Add-BackdropFilter-recorded-layer-kind-and-unshifted.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "73c2fbe53548bcd25c8ff42f75a93770a8611a16b37bee56d7ef7b44e36027f1",
@@ -6137,7 +6140,8 @@
               "patches": [
                 "@@//scripts:patches/vello_cpu-0.3.0/0001-Speed-up-filling-blurred-rounded-rects.patch",
                 "@@//scripts:patches/vello_cpu-0.3.0/0002-Rasterize-recorded-scenes-in-bounded-row-bands.patch",
-                "@@//scripts:patches/vello_cpu-0.3.0/0003-Execute-ColorMatrix-filter-primitives-on-pixmaps.patch"
+                "@@//scripts:patches/vello_cpu-0.3.0/0003-Execute-ColorMatrix-filter-primitives-on-pixmaps.patch",
+                "@@//scripts:patches/vello_cpu-0.3.0/0004-Implement-backdrop-filter-rendering-in-vello_cpu.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "ed1fec424fbba6acf6cbc78bb526447eb77590d95f40419d598870fe37535212",
@@ -6794,7 +6798,8 @@
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0001-Implement-PaintScene-push_clip_path-with-vello_cpu-c.patch",
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0002-Skip-premultiplying-opaque-images.patch",
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0003-Prepare-recorded-scenes-for-band-rasterization.patch",
-                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0004-Skip-unsupported-Blend-filter-primitive-in-vello_cpu.patch"
+                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0004-Skip-unsupported-Blend-filter-primitive-in-vello_cpu.patch",
+                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0005-Forward-backdrop_filter-to-vello_cpu-RenderContext-p.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "a09d9356dd2b2f032345711a350c0e2326a854cb5070f899265bc80fb33884b1",
@@ -8341,7 +8346,8 @@
               ],
               "patches": [
                 "@@//scripts:patches/vello_common-0.3.0/0001-Share-one-gradient-LUT-across-consecutive-equal-grad.patch",
-                "@@//scripts:patches/vello_common-0.3.0/0002-Prepare-ColorMatrix-filter-primitives-in-PreparedFil.patch"
+                "@@//scripts:patches/vello_common-0.3.0/0002-Prepare-ColorMatrix-filter-primitives-in-PreparedFil.patch",
+                "@@//scripts:patches/vello_common-0.3.0/0003-Add-BackdropFilter-recorded-layer-kind-and-unshifted.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "73c2fbe53548bcd25c8ff42f75a93770a8611a16b37bee56d7ef7b44e36027f1",
@@ -8362,7 +8368,8 @@
               "patches": [
                 "@@//scripts:patches/vello_cpu-0.3.0/0001-Speed-up-filling-blurred-rounded-rects.patch",
                 "@@//scripts:patches/vello_cpu-0.3.0/0002-Rasterize-recorded-scenes-in-bounded-row-bands.patch",
-                "@@//scripts:patches/vello_cpu-0.3.0/0003-Execute-ColorMatrix-filter-primitives-on-pixmaps.patch"
+                "@@//scripts:patches/vello_cpu-0.3.0/0003-Execute-ColorMatrix-filter-primitives-on-pixmaps.patch",
+                "@@//scripts:patches/vello_cpu-0.3.0/0004-Implement-backdrop-filter-rendering-in-vello_cpu.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "ed1fec424fbba6acf6cbc78bb526447eb77590d95f40419d598870fe37535212",
@@ -8775,7 +8782,8 @@
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0001-Implement-PaintScene-push_clip_path-with-vello_cpu-c.patch",
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0002-Skip-premultiplying-opaque-images.patch",
                 "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0003-Prepare-recorded-scenes-for-band-rasterization.patch",
-                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0004-Skip-unsupported-Blend-filter-primitive-in-vello_cpu.patch"
+                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0004-Skip-unsupported-Blend-filter-primitive-in-vello_cpu.patch",
+                "@@//scripts:patches/anyrender_vello_cpu-0.18.0/0005-Forward-backdrop_filter-to-vello_cpu-RenderContext-p.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "a09d9356dd2b2f032345711a350c0e2326a854cb5070f899265bc80fb33884b1",
@@ -9568,7 +9576,8 @@
               ],
               "patches": [
                 "@@//scripts:patches/vello_common-0.3.0/0001-Share-one-gradient-LUT-across-consecutive-equal-grad.patch",
-                "@@//scripts:patches/vello_common-0.3.0/0002-Prepare-ColorMatrix-filter-primitives-in-PreparedFil.patch"
+                "@@//scripts:patches/vello_common-0.3.0/0002-Prepare-ColorMatrix-filter-primitives-in-PreparedFil.patch",
+                "@@//scripts:patches/vello_common-0.3.0/0003-Add-BackdropFilter-recorded-layer-kind-and-unshifted.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "73c2fbe53548bcd25c8ff42f75a93770a8611a16b37bee56d7ef7b44e36027f1",
@@ -9589,7 +9598,8 @@
               "patches": [
                 "@@//scripts:patches/vello_cpu-0.3.0/0001-Speed-up-filling-blurred-rounded-rects.patch",
                 "@@//scripts:patches/vello_cpu-0.3.0/0002-Rasterize-recorded-scenes-in-bounded-row-bands.patch",
-                "@@//scripts:patches/vello_cpu-0.3.0/0003-Execute-ColorMatrix-filter-primitives-on-pixmaps.patch"
+                "@@//scripts:patches/vello_cpu-0.3.0/0003-Execute-ColorMatrix-filter-primitives-on-pixmaps.patch",
+                "@@//scripts:patches/vello_cpu-0.3.0/0004-Implement-backdrop-filter-rendering-in-vello_cpu.patch"
               ],
               "remote_patch_strip": 1,
               "sha256": "ed1fec424fbba6acf6cbc78bb526447eb77590d95f40419d598870fe37535212",
