@@ -1382,7 +1382,6 @@ class DocumentImpl extends NodeBase implements Idl.Document {
     const src = ksState().currentScriptSrc;
     if (typeof src !== "string") return null;
     const st = ksState();
-    st.currentScriptRead = true;
     const bodyKey = st.currentScriptBodyKey;
     if (
       src === "" &&

@@ -327,8 +327,13 @@ export function adoptIntoDom(
     sourceDom.removeNode(sourceId);
   } catch {}
   registerParsedHandle(wrapper, destDom);
+  if (cache.get(sourceId) === wrapper) cache.delete(sourceId);
   wrapper._id = newId;
-  if (destDom === dom) adoptedWrapperIds.add(newId);
+  nodeListCache.delete(wrapper);
+  if (destDom === dom) {
+    cache.set(newId, wrapper as unknown as NodeBase);
+    adoptedWrapperIds.add(newId);
+  }
   if (destOwnerDoc !== undefined) wrapper.ownerDocument = destOwnerDoc;
 }
 

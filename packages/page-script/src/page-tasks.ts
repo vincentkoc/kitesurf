@@ -174,9 +174,6 @@ const FIRST_PAGE_TIMER_ID = 1_000_000_000;
 const MAX_PAGE_TIMER_ID = 2_147_483_647;
 const TIMER_ID_MODULO = 4_294_967_296;
 const TIMER_ID_SIGNED_BOUNDARY = 2_147_483_648;
-/** HTML clamps nested timers (nesting level > 5) to at least 4 ms. */
-const TIMER_NESTING_CLAMP_MS = 4;
-let timerNestingLevel = 0;
 const TIMER_HEAP_COMPACT_MIN_ENTRIES = 1_024;
 const TIMER_HEAP_COMPACT_FACTOR = 2;
 const runningTimerIds = new Set<number>();
@@ -351,14 +348,7 @@ function scheduleWheelTimer(
   callbackArgs: unknown[],
   repeats: boolean,
 ): number {
-  let delay = Math.max(0, toTimerLong(delayValue));
-  // HTML's timer initialisation steps: once timers are nested more than five
-  // deep, a shorter timeout is clamped to 4 ms. Without this a page's
-  // `setTimeout(fn, 0)` loop runs back-to-back and monopolises the isolate,
-  // starving the load drain's own timer.
-  if (timerNestingLevel > 5 && delay < TIMER_NESTING_CLAMP_MS) {
-    delay = TIMER_NESTING_CLAMP_MS;
-  }
+  const delay = Math.max(0, toTimerLong(delayValue));
   while (timerWheel.has(timerWheelNextId) || runningTimerIds.has(timerWheelNextId)) {
     timerWheelNextId =
       timerWheelNextId === MAX_PAGE_TIMER_ID ? FIRST_PAGE_TIMER_ID : timerWheelNextId + 1;
@@ -506,7 +496,6 @@ export function pumpDueTimers(
   runningTimerIds.add(timerEntry.id);
   const previousTimerDeadline = activeTimerDeadline;
   activeTimerDeadline = deadlineMs ?? previousTimerDeadline;
-  timerNestingLevel++;
   try {
     timerEntry.callback.call(globalThis, ...timerEntry.callbackArgs);
   } catch (error) {
@@ -514,7 +503,6 @@ export function pumpDueTimers(
       console.error("[kitesurf] pumped timer threw:", error);
     } catch {}
   } finally {
-    timerNestingLevel--;
     activeTimerDeadline = previousTimerDeadline;
   }
   if (ks_bridge_ever_minted()) {

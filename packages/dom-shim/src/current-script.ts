@@ -60,7 +60,6 @@ export function installCurrentScriptHook(): void {
       cs.currentScriptBodyKey = undefined;
       cs.currentScriptRawSrc = undefined;
     } else {
-      cs.currentScriptRead = false;
       cs.currentScriptSrc = String(src);
       cs.currentScriptDomIndex =
         typeof domIndex === "number" && domIndex >= 0 ? domIndex : undefined;
